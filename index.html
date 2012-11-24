@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1"> 
+	<title>Soundgram: Send Songs to Friends via SMS</title>
+	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.2.0/jquery.mobile-1.2.0.min.css" />
+	<script src="http://code.jquery.com/jquery-1.8.2.min.js"></script>
+	<script src="http://code.jquery.com/mobile/1.2.0/jquery.mobile-1.2.0.min.js"></script>
+	<script src="http://connect.soundcloud.com/sdk.js"></script>
+	<script src="base64.js"></script>
+	<script>
+	window.onerror = function(message, url, lineNumber) {  
+	  //save error and send to server for example.
+	  $('#error').html('Shoot, there\'s something wrong with that song. Try another?');
+	  return true;
+	};
+	$(document).ready(function(){
+	  	SC.initialize({
+	    	client_id: "SOUNDCLOUD CLIENT ID",
+	  	});
+		
+		$('#submit_search').click(function(){
+			var query = $('#search').val();
+			if(query != ""){
+				$('#error').html('<img src="load.gif">');
+			SC.get('/tracks', { q: query, order: "hotness", filter:"downloadable"}, function(tracks) {
+				var listing_html = '';
+	  			$.each(tracks, function(){
+					if(this.artwork_url && this.streamable == true && this.downloadable == true){
+						var song_data = {
+							song: this.download_url,
+							track: this.title,
+							artist: this.user.username,
+							url: this.uri
+						};
+						
+						listing_html += '<div class="song" permalink="'+this.permalink_url+'" download="'+Base64.encode(JSON.stringify(song_data))+'" size="'+this.original_content_size+'"><img src="'+this.artwork_url+'\' alt="'+this.title+'"></div>';
+					}
+				});
+				listing_html += '<br style="clear:left;">';
+			
+				$('#error').html('');
+				$('#list').html(listing_html);
+				$('#song_list_wrapper').trigger('expand');
+			});
+		}
+	});
+		
+		$(document).on('click', '.song', function(){
+			var track_url = $(this).attr('permalink');
+			var song = $(this).attr('download');
+			$('#error').html('<img src="load.gif">');
+			SC.oEmbed(track_url, { auto_play: true }, function(oEmbed) {
+			  		$('#play_embed').html(oEmbed.html);
+					$('#play_embed').fadeIn(1000);
+					$('#selected_song').val(song);
+				});
+				$('#error').html('');
+		});
+		
+		$('#send_song').click(function(){
+			$('#error').html('<img src="load.gif">');
+			song_data = $.parseJSON(Base64.decode($('#selected_song').val()));
+			song_data.message = $('#textarea-a').val();
+			song_data = Base64.encode(JSON.stringify(song_data));
+			
+			var data = {
+				from: $('#from_number').val(),
+				to: $('#to_number').val(),
+				song: song_data,
+			}
+			
+			$.ajax({
+				url: "call.php",
+				type: 'POST',
+				data: data,
+				success: function(msg) {
+					window.location= "song_sent.html";
+				},
+				error:function (xhr, ajaxOptions, thrownError){
+					$('#error').html('Whoops! Something went wrong :(');
+			  		console.log(xhr.status);
+			    	console.log(thrownError);
+			  	}
+			});
+		});
+	});
+	</script>
+<style>
+	.song{
+		float: left;
+		cursor: pointer;
+		margin: 0px 2px 0px 2px;
+	}
+	
+	#error{
+		color: red;
+		text-align: center;
+	}
+</style>
+	</head>
+<body>
+	<div data-role="page">
+
+		<div data-role="header">
+			<h1>Soundgram</h1>
+		</div><!-- /header -->
+
+		<div data-role="content">
+			<div data-role="fieldcontain" class="ui-hide-label">
+				<input type="search" id="search" value="phantogram" placeholder="Search Query">
+				<input type="hidden" id="selected_song">
+			</div>
+			<p id="error"></p>
+ <button id="submit_search" data-theme="a">Search</button>
+	<div id="play_embed" style="display:none;"></div>
+	
+	<div id="song_list_wrapper" data-role="collapsible">
+	   <h3>Pick Song</h3>
+	<div id="list"><p>No songs yet. Try a search.</p></div>
+	</div>
+	
+	<div id="send_data_wrapper" data-role="collapsible">
+	   <h3>Send Song To</h3>
+		<div data-role="fieldcontain">
+			<label for="from_number">From:</label> <input type="text" id="from_number" placeholder="Your Phone Number">
+		</div>
+		
+		<div data-role="fieldcontain">
+			<label for="to_number">To:</label> <input type="text" id="to_number" placeholder="Recipient Phone Number">
+		</div>
+		
+	</div>
+	
+	<div id="message_wrapper" data-role="collapsible">
+	   <h3>Message</h3>
+		<div data-role="fieldcontain">
+			<textarea name="textarea" id="textarea-a">
+				
+				</textarea>
+		</div>
+	</div>
+	
+	<button id="send_song" data-theme="b">Send</button>
+	
+	</div><!-- /content -->
+
+		<div data-role="footer">
+			<h4></h4>
+		</div><!-- /footer -->
+
+	</div><!-- /page -->
+</body>
+</html>
